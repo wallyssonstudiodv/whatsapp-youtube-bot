@@ -1,4 +1,3 @@
-
 const { makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys')
 const axios = require('axios')
 const { Boom } = require('@hapi/boom')
@@ -46,7 +45,7 @@ async function startBot() {
         if (!text) return
 
         try {
-            const res = await axios.post('http://localhost:8000/webhook.php', {
+            const res = await axios.post('https://meudrivenet.x10.bz/botzap/webhook.php', {
                 number: sender,
                 message: text
             })
