@@ -11,7 +11,7 @@ const P = require('pino');
 // 📁 Autenticação em arquivo local
 const { state, saveState } = useSingleFileAuthState('./auth_info.json');
 
-// 🌐 Webhook do servidor:
+// 🌐 Webhook do servidor
 const WEBHOOK_URL = 'https://meudrivenet.x10.bz/botzap/webhook.php';
 
 // 🚀 Inicialização do bot
@@ -24,25 +24,29 @@ async function startBot() {
         auth: state
     });
 
-    // Salvar estado
+    // 🔐 Salvar o estado da autenticação
     sock.ev.on('creds.update', saveState);
 
-    // 📥 Mensagens recebidas
+    // 📥 Evento de mensagens recebidas
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
-        if (type !== 'notify') return;
+        if (type !== 'notify' || !messages || !messages[0]) return;
 
         const msg = messages[0];
         if (!msg.message || msg.key.fromMe) return;
 
         const from = msg.key.remoteJid;
+
         const messageContent =
             msg.message.conversation ||
             msg.message.extendedTextMessage?.text ||
+            msg.message.imageMessage?.caption ||
+            msg.message.videoMessage?.caption ||
+            msg.message.documentMessage?.caption ||
             '';
 
         console.log(`📩 Mensagem de ${from}: ${messageContent}`);
 
-        // 🔁 Enviar para webhook
+        // 🔁 Enviar dados ao Webhook
         try {
             await axios.post(WEBHOOK_URL, {
                 number: from,
@@ -53,17 +57,25 @@ async function startBot() {
         }
     });
 
-    // 🔄 Reconexão
+    // 🔄 Monitorar conexão
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect } = update;
+
         if (connection === 'close') {
-            const shouldReconnect =
-                new Boom(lastDisconnect?.error)?.output?.statusCode !==
-                DisconnectReason.loggedOut;
-            console.log('🔌 Desconectado. Reconectar:', shouldReconnect);
-            if (shouldReconnect) startBot();
-        } else if (connection === 'open') {
-            console.log('✅ Conectado ao WhatsApp!');
+            const reason = new Boom(lastDisconnect?.error || {}).output?.statusCode;
+            const shouldReconnect = reason !== DisconnectReason.loggedOut;
+
+            console.log('🔌 Conexão fechada. Reconectar:', shouldReconnect);
+
+            if (shouldReconnect) {
+                startBot();
+            } else {
+                console.log('❌ Sessão encerrada. Faça login novamente.');
+            }
+        }
+
+        if (connection === 'open') {
+            console.log('✅ Bot conectado ao WhatsApp com sucesso!');
         }
     });
 }
