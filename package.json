@@ -1,13 +1,14 @@
-
 {
-  "name": "botwhatsapp",
+  "name": "whatsapp-youtube-bot",
   "version": "1.0.0",
   "main": "index.js",
-  "license": "MIT",
+  "scripts": {
+    "start": "node index.js"
+  },
   "dependencies": {
     "@hapi/boom": "^10.0.1",
-    "@whiskeysockets/baileys": "^6.6.0",
-    "axios": "^1.6.8",
-    "qrcode-terminal": "^0.12.0"
+    "@whiskeysockets/baileys": "5.4.0",
+    "axios": "^1.6.0",
+    "pino": "^8.0.0"
   }
 }
