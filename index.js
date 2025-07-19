@@ -2,6 +2,16 @@ const { makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whis
 const axios = require('axios')
 const { Boom } = require('@hapi/boom')
 const qrcode = require('qrcode-terminal')
+const fs = require('fs')
+
+const configPath = './config.json'
+
+function loadConfig() {
+    if (fs.existsSync(configPath)) {
+        return JSON.parse(fs.readFileSync(configPath, 'utf8'))
+    }
+    return { responder_usuarios: true, grupos_autorizados: [] }
+}
 
 async function startBot() {
     const { state, saveCreds } = await useMultiFileAuthState('auth')
@@ -41,8 +51,15 @@ async function startBot() {
 
         const sender = msg.key.remoteJid
         const text = msg.message.conversation || msg.message.extendedTextMessage?.text
-
         if (!text) return
+
+        const config = loadConfig()
+        const isGroup = sender.endsWith('@g.us')
+        const autorizado = isGroup
+            ? config.grupos_autorizados.includes(sender)
+            : config.responder_usuarios
+
+        if (!autorizado) return
 
         try {
             const res = await axios.post('https://meudrivenet.x10.bz/botzap/webhook.php', {
