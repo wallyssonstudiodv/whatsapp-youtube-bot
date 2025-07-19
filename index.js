@@ -4,6 +4,7 @@ const {
     DisconnectReason,
     fetchLatestBaileysVersion
 } = require('@whiskeysockets/baileys');
+
 const { Boom } = require('@hapi/boom');
 const axios = require('axios');
 const P = require('pino');
@@ -21,7 +22,10 @@ async function startBot() {
         version,
         logger: P({ level: 'silent' }),
         printQRInTerminal: true,
-        auth: state
+        auth: {
+            creds: state.creds,
+            keys: state.keys
+        }
     });
 
     // 🔐 Salvar o estado da autenticação
@@ -62,7 +66,7 @@ async function startBot() {
         const { connection, lastDisconnect } = update;
 
         if (connection === 'close') {
-            const reason = new Boom(lastDisconnect?.error || {}).output?.statusCode;
+            const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
             const shouldReconnect = reason !== DisconnectReason.loggedOut;
 
             console.log('🔌 Conexão fechada. Reconectar:', shouldReconnect);
