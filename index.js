@@ -9,7 +9,7 @@ const axios = require('axios');
 const P = require('pino');
 
 // 📁 Autenticação em arquivo local
-const { state, saveState } = useSingleFileAuthState('./auth_info.json');
+const { state, saveState } = useSingleFileAuthState("./auth_info.json");
 
 // 🌐 Webhook do servidor
 const WEBHOOK_URL = 'https://meudrivenet.x10.bz/botzap/webhook.php';
