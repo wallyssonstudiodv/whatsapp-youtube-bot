@@ -1,79 +1,81 @@
-const { makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys')
-const axios = require('axios')
-const { Boom } = require('@hapi/boom')
-const qrcode = require('qrcode-terminal')
-const fs = require('fs')
+const { default: makeWASocket, useSingleFileAuthState, DisconnectReason, fetchLatestBaileysVersion, makeCacheableSignalKeyStore } = require("@whiskeysockets/baileys");
+const fs = require("fs");
+const axios = require("axios");
+const P = require("pino");
+const { Boom } = require("@hapi/boom");
+const path = require("path");
 
-const configPath = './config.json'
-
-function loadConfig() {
-    if (fs.existsSync(configPath)) {
-        return JSON.parse(fs.readFileSync(configPath, 'utf8'))
-    }
-    return { responder_usuarios: true, grupos_autorizados: [] }
-}
+const { state, saveState } = useSingleFileAuthState('./auth_info.json');
+const comandos = JSON.parse(fs.readFileSync('comandos.json'));
 
 async function startBot() {
-    const { state, saveCreds } = await useMultiFileAuthState('auth')
-
     const sock = makeWASocket({
-        auth: state
-    })
+        logger: P({ level: "silent" }),
+        printQRInTerminal: true,
+        auth: {
+            creds: state.creds,
+            keys: makeCacheableSignalKeyStore(state.keys, P({ level: "silent" }))
+        },
+        version: await fetchLatestBaileysVersion().then(v => v.version)
+    });
 
-    sock.ev.on('creds.update', saveCreds)
+    sock.ev.on("creds.update", saveState);
 
-    sock.ev.on('connection.update', (update) => {
-        const { connection, lastDisconnect, qr } = update
+    sock.ev.on("messages.upsert", async ({ messages, type }) => {
+        if (!messages || !messages[0].message) return;
 
-        if (qr) {
-            console.log("📲 Escaneie o QR abaixo com o WhatsApp:")
-            qrcode.generate(qr, { small: true })
-        }
+        const m = messages[0];
+        const sender = m.key.remoteJid;
+        const text = m.message?.conversation || m.message?.extendedTextMessage?.text || "";
 
-        if (connection === 'close') {
-            const reason = new Boom(lastDisconnect?.error)?.output.statusCode
-            if (reason === DisconnectReason.loggedOut) {
-                console.log("❌ Sessão expirada. Escaneie novamente.")
-            } else {
-                console.log("🔁 Reconectando...")
-                startBot()
+        // Buscar comando no JSON
+        const comando = comandos.find(c => c.comando === text.toLowerCase().trim());
+
+        if (comando) {
+            await sock.sendMessage(sender, { text: comando.resposta });
+
+            if (comando.arquivo) {
+                const filePath = path.resolve(__dirname, comando.arquivo);
+                const extension = path.extname(filePath).toLowerCase();
+
+                const options = {
+                    document: fs.readFileSync(filePath),
+                    fileName: path.basename(filePath),
+                    mimetype: "application/octet-stream"
+                };
+
+                if ([".jpg", ".jpeg", ".png", ".gif"].includes(extension)) {
+                    await sock.sendMessage(sender, { image: fs.readFileSync(filePath), caption: comando.resposta });
+                } else if ([".mp4", ".avi", ".mov"].includes(extension)) {
+                    await sock.sendMessage(sender, { video: fs.readFileSync(filePath), caption: comando.resposta });
+                } else {
+                    await sock.sendMessage(sender, { document: fs.readFileSync(filePath), fileName: path.basename(filePath) });
+                }
+            }
+        } else {
+            // Se não for um comando, envia pro webhook PHP
+            try {
+                const response = await axios.post("http://localhost/webhook.php", {
+                    number: sender,
+                    message: text
+                });
+
+                if (response.data?.reply) {
+                    await sock.sendMessage(sender, { text: response.data.reply });
+                }
+            } catch (err) {
+                console.error("Erro ao enviar para webhook:", err.message);
             }
         }
+    });
 
-        if (connection === 'open') {
-            console.log("✅ Bot conectado com sucesso!")
+    sock.ev.on("connection.update", (update) => {
+        const { connection, lastDisconnect } = update;
+        if (connection === "close") {
+            const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut;
+            if (shouldReconnect) startBot();
         }
-    })
-
-    sock.ev.on('messages.upsert', async ({ messages }) => {
-        const msg = messages[0]
-        if (!msg.message || msg.key.fromMe) return
-
-        const sender = msg.key.remoteJid
-        const text = msg.message.conversation || msg.message.extendedTextMessage?.text
-        if (!text) return
-
-        const config = loadConfig()
-        const isGroup = sender.endsWith('@g.us')
-        const autorizado = isGroup
-            ? config.grupos_autorizados.includes(sender)
-            : config.responder_usuarios
-
-        if (!autorizado) return
-
-        try {
-            const res = await axios.post('https://meudrivenet.x10.bz/botzap/webhook.php', {
-                number: sender,
-                message: text
-            })
-
-            if (res.data.reply) {
-                await sock.sendMessage(sender, { text: res.data.reply })
-            }
-        } catch (err) {
-            console.error('Erro no webhook:', err.message)
-        }
-    })
+    });
 }
 
-startBot()
+startBot();
