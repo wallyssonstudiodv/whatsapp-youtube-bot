@@ -55,7 +55,7 @@ async function startBot() {
         } else {
             // Se não for um comando, envia pro webhook PHP
             try {
-                const response = await axios.post("http://localhost/webhook.php", {
+                const response = await axios.post("https://meudrivenet.x10.bz/botzap/webhook.php", {
                     number: sender,
                     message: text
                 });
