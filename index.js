@@ -3,20 +3,10 @@ const axios = require('axios')
 const { Boom } = require('@hapi/boom')
 const qrcode = require('qrcode-terminal')
 const fs = require('fs')
-const mime = require('mime-types') // 👈 usado para detectar o tipo MIME
+const mime = require('mime-types')
 
-const CONFIG_URL = 'https://meudrivenet.x10.bz/botzap1/config.json'
 const WEBHOOK_URL = 'https://meudrivenet.x10.bz/botzap1/webhook.php'
-
-async function loadConfig() {
-    try {
-        const res = await axios.get(CONFIG_URL)
-        return res.data
-    } catch (e) {
-        console.error('⚠️ Erro ao carregar config.json via HTTP, usando padrão local')
-        return { responder_usuarios: true, grupos_autorizados: [] }
-    }
-}
+const GRUPO_AUTORIZADO = '120363227240067234@g.us' // 🔒 ID do grupo autorizado
 
 async function startBot() {
     const { state, saveCreds } = await useMultiFileAuthState('auth')
@@ -44,16 +34,6 @@ async function startBot() {
 
         if (connection === 'open') {
             console.log("✅ Bot conectado com sucesso!")
-            const chats = await sock.groupFetchAllParticipating()
-            const grupos = {}
-
-            for (const jid in chats) {
-                grupos[jid] = chats[jid].subject
-            }
-
-            fs.writeFileSync('./grupos.json', JSON.stringify(grupos, null, 2))
-            console.log("📂 Lista de grupos salva em grupos.json")
-            console.log("📌 Atualize config.json com os grupos autorizados que deseja responder")
         }
     })
 
@@ -62,16 +42,13 @@ async function startBot() {
         if (!msg.message || msg.key.fromMe) return
 
         const sender = msg.key.remoteJid
+        const isGroup = sender.endsWith('@g.us')
+
+        // 🔐 Responde apenas ao grupo autorizado
+        if (isGroup && sender !== GRUPO_AUTORIZADO) return
+
         const text = msg.message.conversation || msg.message.extendedTextMessage?.text
         if (!text) return
-
-        const config = await loadConfig()
-        const isGroup = sender.endsWith('@g.us')
-        const autorizado = isGroup
-            ? config.grupos_autorizados.includes(sender)
-            : config.responder_usuarios
-
-        if (!autorizado) return
 
         let nomeContato = sender.split('@')[0]
         try {
@@ -83,7 +60,7 @@ async function startBot() {
 
         try {
             const res = await axios.post(WEBHOOK_URL, {
-                number: sender,
+                number: nomeContato,
                 message: text
             })
 
@@ -95,19 +72,18 @@ async function startBot() {
             if (res.data.file_base64 && res.data.filename) {
                 const buffer = Buffer.from(res.data.file_base64, 'base64')
                 const mimetype = mime.lookup(res.data.filename) || 'application/octet-stream'
-                const ext = mime.extension(mimetype)
 
                 if (mimetype.startsWith('image/')) {
                     await sock.sendMessage(sender, {
                         image: buffer,
                         mimetype,
-                        caption: res.data.caption || '🖼️ Aqui está sua imagem'
+                        caption: res.data.caption || ''
                     })
                 } else if (mimetype.startsWith('video/')) {
                     await sock.sendMessage(sender, {
                         video: buffer,
                         mimetype,
-                        caption: res.data.caption || '📹 Aqui está seu vídeo'
+                        caption: res.data.caption || ''
                     })
                 } else {
                     await sock.sendMessage(sender, {
