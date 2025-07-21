@@ -15,14 +15,11 @@ function loadConfig() {
 
 async function startBot() {
     const { state, saveCreds } = await useMultiFileAuthState('auth')
-
-    const sock = makeWASocket({
-        auth: state
-    })
+    const sock = makeWASocket({ auth: state })
 
     sock.ev.on('creds.update', saveCreds)
 
-    sock.ev.on('connection.update', (update) => {
+    sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update
 
         if (qr) {
@@ -42,6 +39,16 @@ async function startBot() {
 
         if (connection === 'open') {
             console.log("✅ Bot conectado com sucesso!")
+            const chats = await sock.groupFetchAllParticipating()
+            const grupos = {}
+
+            for (const jid in chats) {
+                grupos[jid] = chats[jid].subject
+            }
+
+            fs.writeFileSync('./grupos.json', JSON.stringify(grupos, null, 2))
+            console.log("📂 Lista de grupos salva em grupos.json")
+            console.log("📌 Atualize config.json com os grupos autorizados que deseja responder")
         }
     })
 
@@ -62,7 +69,7 @@ async function startBot() {
         if (!autorizado) return
 
         try {
-            const res = await axios.post('https://meudrivenet.x10.bz/botzap/webhook.php', {
+            const res = await axios.post('https://meudrivenet.x10.bz/botzap1/webhook.php', {
                 number: sender,
                 message: text
             })
@@ -71,7 +78,7 @@ async function startBot() {
                 await sock.sendMessage(sender, { text: res.data.reply })
             }
         } catch (err) {
-            console.error('Erro no webhook:', err.message)
+            console.error('❌ Erro no webhook:', err.message)
         }
     })
 }
