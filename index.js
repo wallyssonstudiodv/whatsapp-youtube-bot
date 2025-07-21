@@ -94,13 +94,27 @@ async function startBot() {
 
             if (res.data.file_base64 && res.data.filename) {
                 const buffer = Buffer.from(res.data.file_base64, 'base64')
-                const mimetype = mime.lookup(res.data.filename) || 'application/octet-stream' // 👈 detecta MIME corretamente
+                const mimetype = mime.lookup(res.data.filename) || 'application/octet-stream'
 
-                await sock.sendMessage(sender, {
-                    document: buffer,
-                    mimetype: mimetype,
-                    fileName: res.data.filename
-                })
+                if (mimetype.startsWith('audio/')) {
+                    await sock.sendMessage(sender, {
+                        audio: buffer,
+                        mimetype: mimetype,
+                        ptt: false // ou true se quiser enviar como "áudio de voz"
+                    })
+                } else if (mimetype.startsWith('video/')) {
+                    await sock.sendMessage(sender, {
+                        video: buffer,
+                        mimetype: mimetype,
+                        caption: res.data.caption || '' // opcional
+                    })
+                } else {
+                    await sock.sendMessage(sender, {
+                        document: buffer,
+                        mimetype: mimetype,
+                        fileName: res.data.filename
+                    })
+                }
             }
 
         } catch (err) {
