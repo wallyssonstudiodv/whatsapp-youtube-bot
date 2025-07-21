@@ -3,7 +3,7 @@ const axios = require('axios')
 const { Boom } = require('@hapi/boom')
 const qrcode = require('qrcode-terminal')
 const fs = require('fs')
-const mime = require('mime-types') // 👈 adicionado para detectar o tipo MIME
+const mime = require('mime-types') // 👈 usado para detectar o tipo MIME
 
 const CONFIG_URL = 'https://meudrivenet.x10.bz/botzap1/config.json'
 const WEBHOOK_URL = 'https://meudrivenet.x10.bz/botzap1/webhook.php'
@@ -95,23 +95,24 @@ async function startBot() {
             if (res.data.file_base64 && res.data.filename) {
                 const buffer = Buffer.from(res.data.file_base64, 'base64')
                 const mimetype = mime.lookup(res.data.filename) || 'application/octet-stream'
+                const ext = mime.extension(mimetype)
 
-                if (mimetype.startsWith('audio/')) {
+                if (mimetype.startsWith('image/')) {
                     await sock.sendMessage(sender, {
-                        audio: buffer,
-                        mimetype: mimetype,
-                        ptt: false // ou true se quiser enviar como "áudio de voz"
+                        image: buffer,
+                        mimetype,
+                        caption: res.data.caption || '🖼️ Aqui está sua imagem'
                     })
                 } else if (mimetype.startsWith('video/')) {
                     await sock.sendMessage(sender, {
                         video: buffer,
-                        mimetype: mimetype,
-                        caption: res.data.caption || '' // opcional
+                        mimetype,
+                        caption: res.data.caption || '📹 Aqui está seu vídeo'
                     })
                 } else {
                     await sock.sendMessage(sender, {
                         document: buffer,
-                        mimetype: mimetype,
+                        mimetype,
                         fileName: res.data.filename
                     })
                 }
