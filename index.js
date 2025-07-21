@@ -4,8 +4,8 @@ const { Boom } = require('@hapi/boom')
 const qrcode = require('qrcode-terminal')
 const fs = require('fs')
 
-const CONFIG_URL = 'https://meudrivenet.x10.bz/botzap1/config.json'
-const WEBHOOK_URL = 'https://meudrivenet.x10.bz/botzap1/webhook.php'
+const CONFIG_URL = 'https://meudrivenet.x10.bz/botzap1/config.json' // ajuste seu URL
+const WEBHOOK_URL = 'https://meudrivenet.x10.bz/botzap1/webhook.php' // ajuste seu URL
 
 async function loadConfig() {
     try {
@@ -72,7 +72,7 @@ async function startBot() {
 
         if (!autorizado) return
 
-        let nomeContato = sender.split('@')[0] // fallback simples
+        let nomeContato = sender.split('@')[0]
         try {
             const contato = await sock.onWhatsApp(sender)
             if (contato && contato[0] && contato[0].notify) {
@@ -91,11 +91,12 @@ async function startBot() {
                 await sock.sendMessage(sender, { text: resposta })
             }
 
-            if (res.data.file) {
+            if (res.data.file_base64 && res.data.filename) {
+                const buffer = Buffer.from(res.data.file_base64, 'base64')
                 await sock.sendMessage(sender, {
-                    document: { url: res.data.file },
+                    document: buffer,
                     mimetype: 'application/octet-stream',
-                    fileName: res.data.file.split('/').pop()
+                    fileName: res.data.filename
                 })
             }
 
