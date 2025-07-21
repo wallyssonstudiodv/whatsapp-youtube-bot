@@ -72,16 +72,13 @@ async function startBot() {
 
         if (!autorizado) return
 
-        // Obter nome amigável do contato
-        let nomeContato = sender.split('@')[0] // fallback simples: número
+        let nomeContato = sender.split('@')[0] // fallback simples
         try {
             const contato = await sock.onWhatsApp(sender)
             if (contato && contato[0] && contato[0].notify) {
                 nomeContato = contato[0].notify
             }
-        } catch {
-            // mantém fallback
-        }
+        } catch {}
 
         try {
             const res = await axios.post(WEBHOOK_URL, {
@@ -90,9 +87,18 @@ async function startBot() {
             })
 
             if (res.data.reply) {
-                let resposta = res.data.reply.replace(/{nome}/gi, nomeContato)
+                const resposta = res.data.reply.replace(/{nome}/gi, nomeContato)
                 await sock.sendMessage(sender, { text: resposta })
             }
+
+            if (res.data.file) {
+                await sock.sendMessage(sender, {
+                    document: { url: res.data.file },
+                    mimetype: 'application/octet-stream',
+                    fileName: res.data.file.split('/').pop()
+                })
+            }
+
         } catch (err) {
             console.error('❌ Erro no webhook:', err.message)
         }
