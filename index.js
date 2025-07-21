@@ -3,9 +3,10 @@ const axios = require('axios')
 const { Boom } = require('@hapi/boom')
 const qrcode = require('qrcode-terminal')
 const fs = require('fs')
+const mime = require('mime-types') // 👈 adicionado para detectar o tipo MIME
 
-const CONFIG_URL = 'https://meudrivenet.x10.bz/botzap1/config.json' // ajuste seu URL
-const WEBHOOK_URL = 'https://meudrivenet.x10.bz/botzap1/webhook.php' // ajuste seu URL
+const CONFIG_URL = 'https://meudrivenet.x10.bz/botzap1/config.json'
+const WEBHOOK_URL = 'https://meudrivenet.x10.bz/botzap1/webhook.php'
 
 async function loadConfig() {
     try {
@@ -93,9 +94,11 @@ async function startBot() {
 
             if (res.data.file_base64 && res.data.filename) {
                 const buffer = Buffer.from(res.data.file_base64, 'base64')
+                const mimetype = mime.lookup(res.data.filename) || 'application/octet-stream' // 👈 detecta MIME corretamente
+
                 await sock.sendMessage(sender, {
                     document: buffer,
-                    mimetype: 'application/octet-stream',
+                    mimetype: mimetype,
                     fileName: res.data.filename
                 })
             }
