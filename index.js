@@ -4,13 +4,17 @@ const { Boom } = require('@hapi/boom')
 const qrcode = require('qrcode-terminal')
 const fs = require('fs')
 
-const configPath = 'https://meudrivenet.x10.bz/botzap1/config.json'
+const CONFIG_URL = 'https://meudrivenet.x10.bz/botzap1/config.json'
+const WEBHOOK_URL = 'https://meudrivenet.x10.bz/botzap1/webhook.php'
 
-function loadConfig() {
-    if (fs.existsSync(configPath)) {
-        return JSON.parse(fs.readFileSync(configPath, 'utf8'))
+async function loadConfig() {
+    try {
+        const res = await axios.get(CONFIG_URL)
+        return res.data
+    } catch (e) {
+        console.error('⚠️ Erro ao carregar config.json via HTTP, usando padrão local')
+        return { responder_usuarios: true, grupos_autorizados: [] }
     }
-    return { responder_usuarios: true, grupos_autorizados: [] }
 }
 
 async function startBot() {
@@ -60,7 +64,7 @@ async function startBot() {
         const text = msg.message.conversation || msg.message.extendedTextMessage?.text
         if (!text) return
 
-        const config = loadConfig()
+        const config = await loadConfig()
         const isGroup = sender.endsWith('@g.us')
         const autorizado = isGroup
             ? config.grupos_autorizados.includes(sender)
@@ -68,14 +72,26 @@ async function startBot() {
 
         if (!autorizado) return
 
+        // Obter nome amigável do contato
+        let nomeContato = sender.split('@')[0] // fallback simples: número
         try {
-            const res = await axios.post('https://meudrivenet.x10.bz/botzap1/webhook.php', {
+            const contato = await sock.onWhatsApp(sender)
+            if (contato && contato[0] && contato[0].notify) {
+                nomeContato = contato[0].notify
+            }
+        } catch {
+            // mantém fallback
+        }
+
+        try {
+            const res = await axios.post(WEBHOOK_URL, {
                 number: sender,
                 message: text
             })
 
             if (res.data.reply) {
-                await sock.sendMessage(sender, { text: res.data.reply })
+                let resposta = res.data.reply.replace(/{nome}/gi, nomeContato)
+                await sock.sendMessage(sender, { text: resposta })
             }
         } catch (err) {
             console.error('❌ Erro no webhook:', err.message)
