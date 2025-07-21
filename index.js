@@ -4,7 +4,7 @@ const { Boom } = require('@hapi/boom')
 const qrcode = require('qrcode-terminal')
 const fs = require('fs')
 
-const configPath = './config.json'
+const configPath = 'https://meudrivenet.x10.bz/botzap1/config.json'
 
 function loadConfig() {
     if (fs.existsSync(configPath)) {
