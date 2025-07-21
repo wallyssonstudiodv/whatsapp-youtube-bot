@@ -5,7 +5,7 @@ const qrcode = require('qrcode-terminal')
 const fs = require('fs')
 const mime = require('mime-types')
 
-const WEBHOOK_URL = 'https://meudrivenet.x10.bz/botzap1/webhook.php'
+const WEBHOOK_URL = 'https://meudrivenet.x10.bz/canal/webhook.php'
 const GRUPO_AUTORIZADO = '120363227240067234@g.us' // 🔒 ID do grupo autorizado
 
 async function startBot() {
