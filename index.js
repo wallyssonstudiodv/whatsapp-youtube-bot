@@ -9,8 +9,11 @@ const WEBHOOK_URL = 'https://meudrivenet.x10.bz/canal/webhook.php'
 const GRUPO_AUTORIZADO = '120363227240067234@g.us' // 🔒 ID do grupo autorizado
 
 async function startBot() {
-    const { state, saveCreds } = await useMultiFileAuthState('auth')
-    const sock = makeWASocket({ auth: state })
+    const { state, saveCreds } = await useMultiFileAuthState('auth') // ✅ sessão salva
+    const sock = makeWASocket({ 
+        auth: state, 
+        printQRInTerminal: true 
+    })
 
     sock.ev.on('creds.update', saveCreds)
 
